@@ -1,69 +1,97 @@
 const router = require('express').Router();
-const { Comment, Post, User } = require('../models');
+const sequelize = require('../config/connection');
+const { Post, User, Comment } = require('../models');
 
-//GET all posts for the homepage including associated Users data.
-router.get('/', async (req, res) => {
-    try {
-        const dbPostsData = await Post.findAll({
-            include: [User, {
-                model: Comment, 
-                include: [User]
-            }], 
-        });
-
-        const posts = dbPostsData.map((post) => post.get({ plain: true }));
-
-        res.render('get-posts', { posts, loggedIn: req.session.loggedIn });
-
-    } catch (err) {
-        res.status(500).json(err);
-    }
+// get all posts for homepage
+router.get('/', (req, res) => {
+  console.log('======================');
+  Post.findAll({
+    attributes: ['id', 'title', 'description', 'created_at'],
+    include: [
+      {
+        model: Comment,
+        attributes: ['id', 'comment_text', 'post_id', 'user_id', 'created_at'],
+        include: {
+          model: User,
+          attributes: ['username'],
+        },
+      },
+      {
+        model: User,
+        attributes: ['username'],
+      },
+    ],
+  })
+    .then((dbPostData) => {
+      const posts = dbPostData.map((post) => post.get({ plain: true }));
+      console.log(posts);
+      res.render('homepage', {
+        posts,
+        loggedIn: req.session.loggedIn,
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+      res.status(500).json(err);
+    });
 });
 
-//GET a single post.
-router.get('/post/:id', async (req, res) => {
-    try {
-        const singlePostData = await Post.findByPk(req.params.id, {
-            include: [User, {
-                model: Comment,
-                include: [User]
-            }],
-            
-        });
-        if (singlePostData) {
-            const post = singlePostData.get({ plain: true});
+// get single post
+router.get('/post/:id', (req, res) => {
+  Post.findOne({
+    where: {
+      id: req.params.id,
+    },
+    attributes: ['id', 'title', 'description', 'created_at'],
+    include: [
+      {
+        model: Comment,
+        attributes: ['id', 'comment_text', 'post_id', 'user_id', 'created_at'],
+        include: {
+          model: User,
+          attributes: ['username'],
+        },
+      },
+      {
+        model: User,
+        attributes: ['username'],
+      },
+    ],
+  })
+    .then((dbPostData) => {
+      if (!dbPostData) {
+        res.status(404).json({ message: 'No post found with this id' });
+        return;
+      }
 
-            console.log(post);
-            res.render('homepage', { post, loggedIn: req.session.loggedIn });
+      const post = dbPostData.get({ plain: true });
 
-        } else {
-            if (!singlePostData) {
-                res.status(404).json({ message: 'No post found with that id!' });
-                return;
-            }
-        }
-    } catch (err) {
-        res.status(500).json(err);
-    }
+      res.render('single-post', {
+        post,
+        loggedIn: req.session.loggedIn,
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+      res.status(500).json(err);
+    });
 });
 
-//Login route.
 router.get('/login', (req, res) => {
-    if (req.session.loggedIn) {
-        res.redirect('/');
-        return;
-    }
-    res.render('login');
+  if (req.session.loggedIn) {
+    res.redirect('/');
+    return;
+  }
+
+  res.render('login');
 });
 
-//Sign-up route.
 router.get('/signup', (req, res) => {
-    if (req.session.loggedIn) {
-        res.redirect('/');
-        return;
-    }
+  if (!req.session.loggedIn) {
     res.render('signup');
+  } else {
+    res.redirect('/');
+  }
 });
 
-//Export the routes.
 module.exports = router;

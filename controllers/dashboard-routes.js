@@ -1,54 +1,76 @@
 const router = require('express').Router();
-const { Post } = require('../models');
+const sequelize = require('../config/connection');
+const { Post, User, Comment } = require('../models');
 const withAuth = require('../utils/auth');
 
-//GET all posts for the individual.
-router.get('/', withAuth, async (req, res) => {
-  try {
-    const postData = await Post.findAll({
-      where: {
-        user_id: req.session.userId,
+// get all posts for dashboard
+router.get('/', withAuth, (req, res) => {
+  console.log(req.session);
+  console.log('======================');
+  Post.findAll({
+    where: {
+      user_id: req.session.user_id,
+    },
+    attributes: ['id', 'title', 'description', 'created_at'],
+    include: [
+      {
+        model: Comment,
+        attributes: ['id', 'comment_text', 'post_id', 'user_id', 'created_at'],
+        include: {
+          model: User,
+          attributes: ['username'],
+        },
       },
+      {
+        model: User,
+        attributes: ['username'],
+      },
+    ],
+  })
+    .then((dbPostData) => {
+      const posts = dbPostData.map((post) => post.get({ plain: true }));
+      console.log(posts);
+      res.render('dashboard', { posts, loggedIn: true });
+    })
+    .catch((err) => {
+      console.log(err);
+      res.status(500).json(err);
     });
-
-    const posts = postData.map((post) => post.get({ plain: true }));
-
-    console.log(posts);
-    res.render('dashboard', {
-      posts,
-      loggedIn: req.session.loggedIn,
-    });
-  } catch (err) {
-    console.log(err);
-    res.redirect('login');
-  }
 });
 
-//Create the new post and render the form.
-router.get('/create', withAuth, (req, res) => {
-  res.render('new-post', {
-    loggedIn: req.session.loggedIn,
-  });
-});
+router.get('/edit/:id', withAuth, (req, res) => {
+  Post.findByPk(req.params.id, {
+    attributes: ['id', 'title', 'description', 'created_at'],
+    include: [
+      {
+        model: Comment,
+        attributes: ['id', 'comment_text', 'post_id', 'user_id', 'created_at'],
+        include: {
+          model: User,
+          attributes: ['username'],
+        },
+      },
+      {
+        model: User,
+        attributes: ['username'],
+      },
+    ],
+  })
+    .then((dbPostData) => {
+      if (dbPostData) {
+        const post = dbPostData.get({ plain: true });
 
-//Update the user post using id and render the form.
-router.get('/update/:id', withAuth, async (req, res) => {
-  try {
-    const postData = await Post.findByPk(req.params.id);
-
-    if (postData) {
-      const post = postData.get({ plain: true });
-
-      res.render('edit-posts', {
-        post,
-        loggedIn: req.session.loggedIn,
-      });
-    } else {
-      res.status(404).end();
-    }
-  } catch (err) {
-    res.redirect('login');
-  }
+        res.render('edit-post', {
+          post,
+          loggedIn: true,
+        });
+      } else {
+        res.status(404).end();
+      }
+    })
+    .catch((err) => {
+      res.status(500).json(err);
+    });
 });
 
 module.exports = router;

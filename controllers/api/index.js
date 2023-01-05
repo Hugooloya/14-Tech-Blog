@@ -1,15 +1,11 @@
-//Require the Express router.
 const router = require('express').Router();
 
-//Require Comments, Posts and User routes.
-const commentRoutes = require('./comment-routes');
+const userRoutes = require('./user-routes.js');
 const postRoutes = require('./post-routes');
-const userRoutes = require('./user-routes');
+const commentRoutes = require('./comment-routes');
 
-//Use created routes.
-router.use('/comment', commentRoutes);
-router.use('/post', postRoutes);
-router.use('/user', userRoutes);
+router.use('/users', userRoutes);
+router.use('/posts', postRoutes);
+router.use('/comments', commentRoutes);
 
-//Export the router.
 module.exports = router;
